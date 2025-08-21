@@ -1,0 +1,14 @@
+John Doe
+Machine Learning Engineer | San Francisco, CA
+
+Experience
+Acme Inc. — Software Engineer — 2021 - Present
+- Built ML pipelines in Python; deployed on AWS
+
+Beta Corp — Data Analyst — 2019 - 2020
+
+Education
+University of California — BS in Computer Science — 2018
+
+Skills
+Python, Pandas, NumPy, scikit-learn, TensorFlow, AWS, Docker

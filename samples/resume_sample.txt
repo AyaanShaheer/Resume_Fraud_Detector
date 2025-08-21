@@ -1,0 +1,15 @@
+John Doe
+john.doe@example.com | +1 555 123 4567 | San Francisco, CA
+
+Skills: Python, Pandas, NumPy, Scikit-learn, TensorFlow, AWS, Docker, Kubernetes
+
+Experience
+Software Engineer at Acme Inc. — Jan 2021 - Present
+- Built ML pipelines using Python and scikit-learn; improved model accuracy by 12%
+- Deployed services on AWS with Docker and Kubernetes
+
+Data Analyst at Beta Corp — 2019 - 2020
+- Analyzed sales data with Python and Pandas; reduced reporting time by 30%
+
+Education
+Bachelor of Science in Computer Science, University of California, 2018, GPA: 3.6/4.0

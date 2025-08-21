@@ -1,0 +1,117 @@
+{
+  "timestamp": "2025-08-21T02:29:49.590836",
+  "candidate_profile": {
+    "name": "John Doe",
+    "email": "john.doe@example.com",
+    "phone": "+1 555 123 4567",
+    "locations": [
+      "San Francisco, CA",
+      "Python, Pandas",
+      "Docker, Kubernetes",
+      "Computer Science, University"
+    ],
+    "education": [
+      {
+        "text": "Bachelor of Science in Computer Science, University of California, 2018, GPA: 3.6/4.0",
+        "degree": "Bachelor of Science in Computer Science",
+        "institution": "University of California",
+        "field": "Computer Science",
+        "graduation_year": 2018,
+        "gpa": 3.6
+      }
+    ],
+    "experience": [
+      {
+        "text": "Software Engineer at Acme Inc. \u2014 Jan 2021 - Present - Built ML pipelines using Python and scikit-learn; improved model accuracy by 12% - Deployed services on AWS with Docker and Kubernetes",
+        "company": "Acme Inc.",
+        "role": "Software Engineer",
+        "start_date": "2021-01-01T00:00:00",
+        "end_date": "2025-08-21T02:29:49.586321",
+        "duration_months": 55,
+        "is_full_time": true,
+        "is_current": true,
+        "skills_mentioned": [
+          "python",
+          "scikit-learn",
+          "aws",
+          "docker",
+          "kubernetes"
+        ],
+        "achievements": [
+          "improved model accuracy by 12% - Deployed services on AWS with Docker and Kubernetes"
+        ]
+      },
+      {
+        "text": "Data Analyst at Beta Corp \u2014 2019 - 2020 - Analyzed sales data with Python and Pandas; reduced reporting time by 30%",
+        "company": "Beta Corp",
+        "role": "Data Analyst",
+        "start_date": "2019-01-01T00:00:00",
+        "end_date": "2020-01-01T00:00:00",
+        "duration_months": 12,
+        "is_full_time": true,
+        "is_current": false,
+        "skills_mentioned": [
+          "python",
+          "pandas"
+        ],
+        "achievements": [
+          "reduced reporting time by 30%"
+        ]
+      }
+    ],
+    "skills": [
+      "tensorflow",
+      "kubernetes",
+      "numpy",
+      "scikit-learn",
+      "pandas",
+      "docker",
+      "python",
+      "aws"
+    ],
+    "certifications": [],
+    "languages": [],
+    "total_experience_years": 5.6,
+    "career_level": "Mid"
+  },
+  "fraud_flags": [],
+  "fit_score": {
+    "overall_score": 75.0,
+    "skill_match_score": 100.0,
+    "experience_match_score": 100.0,
+    "education_match_score": 50.0,
+    "keyword_density_score": 50.0,
+    "semantic_similarity_score": null,
+    "details": {
+      "jd_requirements": {
+        "skills": [
+          "python",
+          "scikit-learn",
+          "tensorflow",
+          "aws",
+          "docker"
+        ],
+        "experience": {
+          "years": 3
+        },
+        "education": {}
+      },
+      "weights_used": {
+        "skills": 0.3,
+        "experience": 0.3,
+        "education": 0.15,
+        "keywords": 0.15,
+        "semantic": 0.1
+      }
+    }
+  },
+  "verification_score": 100.0,
+  "risk_level": "LOW",
+  "verdict": "SAFE TO PROCEED - Minor concerns only",
+  "summary": "No significant fraud indicators detected. Candidate appears authentic.",
+  "recommendations": [
+    "Proceed with standard interview process",
+    "Address minor concerns during interview"
+  ],
+  "ai_insights": ""
+}

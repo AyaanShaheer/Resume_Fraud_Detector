@@ -38,7 +38,10 @@ except ImportError:
     st = None
 
 # Core ML/NLP libraries
-import numpy as np
+try:
+    import numpy as np
+except ImportError:
+    np = None
 try:
     from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
     from sklearn.metrics.pairwise import cosine_similarity
@@ -526,9 +529,11 @@ class EnhancedFraudDetector:
             for j in range(i + 1, len(dated_experiences)):
                 exp1, exp2 = dated_experiences[i], dated_experiences[j]
                 
-                if self._experiences_overlap(exp1, exp2):
-                    overlap_months = self._calculate_overlap_months(exp1, exp2)
-                    
+                # Inline overlap calculation to avoid missing helper methods in some environments
+                if exp1.start_date and exp1.end_date and exp2.start_date and exp2.end_date:
+                    latest_start = max(exp1.start_date, exp2.start_date)
+                    earliest_end = min(exp1.end_date, exp2.end_date)
+                    overlap_months = self._calculate_months_between(latest_start, earliest_end) if latest_start <= earliest_end else 0
                     if exp1.is_full_time and exp2.is_full_time and overlap_months >= 2:
                         flags.append(FraudFlag(
                             flag_type="Overlapping Full-Time Positions",
@@ -585,6 +590,37 @@ class EnhancedFraudDetector:
                 ))
         
         return flags
+
+    def _is_junior_role(self, exp: ExperienceEntry) -> bool:
+        text = (exp.role or exp.text or '').lower()
+        return any(tok in text for tok in ['intern', 'junior', 'entry-level', 'trainee', 'graduate'])
+
+    def _has_leadership_claims(self, exp: ExperienceEntry) -> bool:
+        return self._has_leadership_indicators(exp.text or '')
+
+    def _backgrounds_compatible(self, required: Dict[str, Any], candidate: Dict[str, Any]) -> bool:
+        """Check if candidate education satisfies JD requirements.
+        - Candidate degree level must be >= required level (if specified)
+        - If JD lists fields, require at least one overlap
+        """
+        if not required:
+            return True
+        req_level = (required.get('degree_level') or 0)
+        cand_level = (candidate.get('degree_level') or 0)
+        if req_level and cand_level < req_level:
+            return False
+        req_fields = set(required.get('fields') or [])
+        cand_fields = set(candidate.get('fields') or [])
+        if req_fields:
+            def norm(values: set) -> set:
+                out = set()
+                for v in values:
+                    x = re.sub(r'\s+', ' ', str(v).lower()).strip()
+                    x = re.sub(r's$', '', x)
+                    out.add(x)
+                return out
+            return bool(norm(req_fields) & norm(cand_fields))
+        return True
     
     def detect_education_inconsistencies(self, profile: CandidateProfile, jd_text: str = "") -> List[FraudFlag]:
         """Detect education-related fraud indicators"""
@@ -592,8 +628,9 @@ class EnhancedFraudDetector:
         
         # Check for degree-role mismatch
         if jd_text:
-            required_background = self.analyze_required_background(jd_text)
-            candidate_background = self.analyze_candidate_background(profile)
+            # Use internal analyzers (underscored) to avoid missing attributes
+            required_background = self._analyze_required_background(jd_text)
+            candidate_background = self._analyze_candidate_background(profile)
             
             if required_background and candidate_background:
                 if not self._backgrounds_compatible(required_background, candidate_background):
@@ -658,6 +695,20 @@ class EnhancedFraudDetector:
             ))
         
         return flags
+
+    def _calculate_text_overlap(self, a: str, b: str) -> float:
+        """Approximate textual overlap using 3-word shingles and Jaccard index."""
+        tokens_a = re.findall(r"\w+", a.lower())
+        tokens_b = re.findall(r"\w+", b.lower())
+        def shingles(tokens, n=3):
+            return {tuple(tokens[i:i+n]) for i in range(len(tokens)-n+1)} if len(tokens) >= n else set()
+        sa = shingles(tokens_a)
+        sb = shingles(tokens_b)
+        if not sa or not sb:
+            return 0.0
+        inter = len(sa & sb)
+        union = len(sa | sb)
+        return inter / union if union else 0.0
     
     def detect_verification_discrepancies(self, profile: CandidateProfile, linkedin_text: str = "") -> List[FraudFlag]:
         """Compare resume with LinkedIn or other public profiles"""
@@ -728,7 +779,7 @@ class EnhancedFraudDetector:
         
         # Semantic similarity using embeddings
         semantic_score = None
-        if self.sentence_model:
+        if self.sentence_model and np is not None:
             try:
                 resume_text = self._profile_to_text(profile)
                 embeddings = self.sentence_model.encode([resume_text, jd_text])
@@ -1202,6 +1253,60 @@ class EnhancedFraudDetector:
             requirements['experience']['years'] = int(years_match.group(1))
         
         return requirements
+
+    def _analyze_required_background(self, jd_text: str) -> Dict[str, Any]:
+        """Extracts degree level and fields from a JD for education matching."""
+        if not jd_text:
+            return {}
+        text = jd_text.lower()
+        level = 0
+        if re.search(r'ph\.?d|doctorate|dphil', text):
+            level = 3
+        elif re.search(r"master'?s|m\.a\.|m\.s\.|mba|mtech|m\.eng", text):
+            level = 2
+        elif re.search(r"bachelor'?s|b\.a\.|b\.s\.|btech|b\.eng|\bbe\b|\bbs\b|\bba\b", text):
+            level = 1
+        fields_vocab = [
+            'computer science','information technology','software engineering','electrical engineering',
+            'electronics','mechanical engineering','civil engineering','data science','statistics',
+            'mathematics','physics','chemistry','biology','economics','finance','accounting','business',
+            'marketing','operations','human resources','psychology','design','architecture','law'
+        ]
+        requested_fields: List[str] = []
+        for field_name in fields_vocab:
+            if re.search(rf"\b{re.escape(field_name)}\b", text):
+                requested_fields.append(field_name)
+        extra = re.findall(r'(?:degree|major|background)\s+in\s+([a-zA-Z\s]{3,40})', text)
+        for item in extra:
+            item_norm = item.strip().lower()
+            if item_norm and item_norm not in requested_fields:
+                requested_fields.append(item_norm)
+        return {"degree_level": level if level else None, "fields": requested_fields}
+
+    def _analyze_candidate_background(self, profile: CandidateProfile) -> Dict[str, Any]:
+        """Summarize candidate education to compare with JD background requirements."""
+        if not profile.education:
+            return {}
+        def degree_to_level(degree_text: Optional[str]) -> int:
+            if not degree_text:
+                return 0
+            d = degree_text.lower()
+            if re.search(r'ph\.?d|doctorate|dphil', d):
+                return 3
+            if re.search(r"master|m\.a\.|m\.s\.|mba|mtech|m\.eng", d):
+                return 2
+            if re.search(r"bachelor|b\.a\.|b\.s\.|btech|b\.eng|\bbe\b|\bbs\b|\bba\b", d):
+                return 1
+            return 0
+        highest_level = 0
+        fields: List[str] = []
+        for edu in profile.education:
+            highest_level = max(highest_level, degree_to_level(edu.degree))
+            if edu.field:
+                field_norm = str(edu.field).strip().lower()
+                if field_norm and field_norm not in fields and len(field_norm) < 50:
+                    fields.append(field_norm)
+        return {"degree_level": highest_level if highest_level else None, "fields": fields}
     
     def _looks_like_job_title(self, line: str) -> bool:
         """Check if line looks like a job title"""
@@ -1377,6 +1482,20 @@ class EnhancedFraudDetector:
         
         return None
 
+    def _assess_generic_content(self, resume_text: str) -> float:
+        """Score generic content by counting buzzwords and vague phrases (0..1)."""
+        text = resume_text.lower()
+        generic_terms = set(self.SUSPICIOUS_PATTERNS.get('generic_descriptions', []) +
+                            self.SUSPICIOUS_PATTERNS.get('vague_achievements', []) +
+                            self.SUSPICIOUS_PATTERNS.get('buzzwords', []))
+        if not generic_terms:
+            return 0.0
+        hits = 0
+        for term in generic_terms:
+            if term in text:
+                hits += 1
+        return min(1.0, hits / max(5, len(generic_terms)))
+
 
 # =============================================================================
 # VISUALIZATION COMPONENTS
@@ -1452,9 +1571,16 @@ class VisualizationEngine:
         fig = plt.figure(figsize=(4, 4))
         ax = fig.add_subplot(111, polar=True)
         
-        angles = np.linspace(0, 2 * np.pi, len(categories), endpoint=False)
-        scores = normalized_scores + [normalized_scores[0]]  # Complete the circle
-        angles = np.concatenate((angles, [angles[0]]))
+        if np is None:
+            # Fallback simple polygon without numpy
+            import math as _math
+            angles = [2 * _math.pi * i / len(categories) for i in range(len(categories))]
+            angles.append(angles[0])
+            scores = normalized_scores + [normalized_scores[0]]
+        else:
+            angles = np.linspace(0, 2 * np.pi, len(categories), endpoint=False)
+            scores = normalized_scores + [normalized_scores[0]]  # Complete the circle
+            angles = np.concatenate((angles, [angles[0]]))
         
         ax.plot(angles, scores, 'o-', linewidth=2, color='#e74c3c')
         ax.fill(angles, scores, alpha=0.25, color='#e74c3c')
@@ -1574,6 +1700,80 @@ class VisualizationEngine:
                 return out
             return bool(norm_set(req_fields) & norm_set(cand_fields))
         return True
+
+    # ------------------------------------------------------------------
+    # Missing helpers (timeline and scoring) that earlier references use
+    # ------------------------------------------------------------------
+    def _experiences_overlap(self, exp1: ExperienceEntry, exp2: ExperienceEntry) -> bool:
+        if not (exp1.start_date and exp1.end_date and exp2.start_date and exp2.end_date):
+            return False
+        latest_start = max(exp1.start_date, exp2.start_date)
+        earliest_end = min(exp1.end_date, exp2.end_date)
+        return latest_start <= earliest_end
+
+    def _calculate_overlap_months(self, exp1: ExperienceEntry, exp2: ExperienceEntry) -> int:
+        if not self._experiences_overlap(exp1, exp2):
+            return 0
+        latest_start = max(exp1.start_date, exp2.start_date)
+        earliest_end = min(exp1.end_date, exp2.end_date)
+        return self._calculate_months_between(latest_start, earliest_end)
+
+    def _get_highest_degree_level(self, education: List[EducationEntry]) -> int:
+        def to_level(text: Optional[str]) -> int:
+            if not text:
+                return 0
+            t = text.lower()
+            if re.search(r'ph\.?d|doctorate|dphil', t):
+                return 3
+            if re.search(r"master|m\.a\.|m\.s\.|mba|mtech|m\.eng", t):
+                return 2
+            if re.search(r"bachelor|b\.a\.|b\.s\.|btech|b\.eng|\bbe\b|\bbs\b|\bba\b", t):
+                return 1
+            return 0
+        return max((to_level(edu.degree) for edu in education), default=0)
+
+    def _calculate_field_match(self, education: List[EducationEntry], required_fields: List[str]) -> float:
+        if not required_fields:
+            return 1.0
+        cand_fields = set()
+        for edu in education:
+            if edu.field:
+                cand_fields.add(re.sub(r'\s+', ' ', str(edu.field).lower()).strip())
+        req = [re.sub(r'\s+', ' ', f.lower()).strip() for f in required_fields]
+        matches = sum(1 for f in req if any(f in c or c in f for c in cand_fields))
+        return matches / max(1, len(req))
+
+    def _calculate_industry_match(self, experiences: List[ExperienceEntry], required_industries: List[str]) -> float:
+        if not required_industries:
+            return 1.0
+        exp_texts = [f"{exp.company or ''} {exp.role or ''} {exp.text}".lower() for exp in experiences]
+        req = [r.lower() for r in required_industries]
+        matches = sum(1 for r in req if any(r in t for t in exp_texts))
+        return matches / max(1, len(req))
+
+    def _calculate_level_match(self, experiences: List[ExperienceEntry], required_level: str) -> float:
+        if not required_level:
+            return 0.5
+        required_level = required_level.lower()
+        level_order = ['intern', 'junior', 'entry', 'mid', 'senior', 'lead', 'manager', 'director', 'vp', 'executive']
+        def role_level(role: Optional[str]) -> int:
+            if not role:
+                return 0
+            r = role.lower()
+            for idx, token in enumerate(level_order):
+                if token in r:
+                    return idx
+            if any(k in r for k in ['lead', 'principal', 'head']):
+                return level_order.index('lead')
+            if 'manager' in r:
+                return level_order.index('manager')
+            if 'senior' in r or 'sr' in r:
+                return level_order.index('senior')
+            return level_order.index('mid')
+        req_idx = level_order.index(required_level) if required_level in level_order else level_order.index('mid')
+        cand_max = max((role_level(exp.role) for exp in experiences), default=0)
+        return 1.0 if cand_max >= req_idx else max(0.0, cand_max / req_idx)
+
 class ReportGenerator:
     """Generate comprehensive analysis reports"""
     
