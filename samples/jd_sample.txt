@@ -1,0 +1,6 @@
+We are hiring a Machine Learning Engineer.
+
+Requirements:
+- Bachelor’s or Master’s degree in Computer Science, Software Engineering, or related field
+- 3+ years of experience building ML models
+- Skills: Python, scikit-learn, TensorFlow, AWS, Docker
