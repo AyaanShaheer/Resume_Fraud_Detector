@@ -128,6 +128,8 @@ class ExperienceEntry:
     is_current: bool = False
     skills_mentioned: List[str] = field(default_factory=list)
     achievements: List[str] = field(default_factory=list)
+    section: Optional[str] = None  # e.g., 'experience', 'projects', 'education'
+    entry_type: str = "experience"  # 'experience' or 'project'
 
 
 @dataclass
@@ -373,8 +375,16 @@ class EnhancedFraudDetector:
         return education_entries
     
     def _parse_experience(self, text: str) -> List[ExperienceEntry]:
-        """Parse work experience entries"""
-        experience_entries = []
+        """Parse work experience entries and avoid misclassifying Projects as Experience."""
+        experience_entries: List[ExperienceEntry] = []
+        
+        # Detect current section to avoid counting projects as experience
+        section = None
+        section_markers = {
+            'experience': re.compile(r'^\s*(work\s+)?experience\b', re.I),
+            'projects': re.compile(r'^\s*projects?\b', re.I),
+            'education': re.compile(r'^\s*education\b', re.I),
+        }
         
         # Date range pattern
         date_pattern = r'(?P<start>(?:\d{1,2}[/-]\d{4}|[A-Za-z]{3,9}\s+\d{4}|\d{4}))\s*[-–—]\s*(?P<end>(?:\d{1,2}[/-]\d{4}|[A-Za-z]{3,9}\s+\d{4}|\d{4}|present|current))'
@@ -383,24 +393,39 @@ class EnhancedFraudDetector:
         i = 0
         
         while i < len(lines):
-            line = lines[i]
-            date_match = re.search(date_pattern, line, re.IGNORECASE)
+            raw_line = lines[i]
+            line = raw_line.strip()
+            # Track section (strip non-letter prefixes like bullets or symbols)
+            header_line = re.sub(r'^[^A-Za-z]+', '', line)
+            for name, rx in section_markers.items():
+                if rx.search(header_line):
+                    section = name
+                    break
+            
+            date_match = re.search(date_pattern, raw_line, re.IGNORECASE)
             
             if date_match:
-                # Found a date range, parse the experience block
+                # Skip parsing if inside a Projects section
+                if section == 'projects':
+                    i += 1
+                    continue
                 entry = self._parse_experience_block(lines, i, date_match)
                 if entry:
+                    entry.section = section or 'experience'
+                    entry.entry_type = 'experience'
                     experience_entries.append(entry)
                 i += 1
             else:
-                # Look for role-like lines
-                if self._looks_like_job_title(line):
-                    entry = self._parse_experience_without_dates(lines, i)
-                    if entry:
-                        experience_entries.append(entry)
+                if self._looks_like_job_title(raw_line):
+                    if section != 'projects':
+                        entry = self._parse_experience_without_dates(lines, i)
+                        if entry:
+                            entry.section = section or 'experience'
+                            entry.entry_type = 'experience'
+                            experience_entries.append(entry)
                 i += 1
         
-        return experience_entries[:15]  # Limit to 15 entries
+        return experience_entries[:15]
     
     def _parse_experience_block(self, lines: List[str], start_idx: int, date_match) -> Optional[ExperienceEntry]:
         """Parse a complete experience block"""
@@ -1057,18 +1082,31 @@ class EnhancedFraudDetector:
         return (end.year - start.year) * 12 + (end.month - start.month)
     
     def _calculate_total_experience(self, experiences: List[ExperienceEntry]) -> float:
-        """Calculate total years of experience"""
+        """Calculate total years of experience, excluding project entries and duplicates."""
         if not experiences:
             return 0.0
         
-        total_months = 0
-        for exp in experiences:
-            if exp.duration_months:
-                total_months += exp.duration_months
-            elif exp.start_date and exp.end_date:
-                months = self._calculate_months_between(exp.start_date, exp.end_date)
-                total_months += months
+        # Filter out entries labeled as projects or from 'projects' section
+        filtered = [e for e in experiences if (e.entry_type != 'project' and (e.section or 'experience') != 'projects')]
+        if not filtered:
+            return 0.0
         
+        # Build month coverage set to avoid double counting overlaps
+        covered = set()
+        for exp in filtered:
+            if not (exp.start_date and exp.end_date):
+                # skip undated entries from experience length calculation
+                continue
+            start = exp.start_date.replace(day=1)
+            end = exp.end_date.replace(day=1)
+            cursor = start
+            while cursor <= end:
+                covered.add((cursor.year, cursor.month))
+                # advance one month
+                next_month = 1 if cursor.month == 12 else cursor.month + 1
+                next_year = cursor.year + 1 if cursor.month == 12 else cursor.year
+                cursor = cursor.replace(year=next_year, month=next_month)
+        total_months = len(covered)
         return round(total_months / 12.0, 1)
     
     def _determine_career_level(self, profile: CandidateProfile) -> str:
@@ -1309,10 +1347,16 @@ class EnhancedFraudDetector:
         return {"degree_level": highest_level if highest_level else None, "fields": fields}
     
     def _looks_like_job_title(self, line: str) -> bool:
-        """Check if line looks like a job title"""
-        line_lower = line.lower()
-        job_keywords = ['engineer', 'developer', 'analyst', 'manager', 'director', 'specialist', 'consultant']
-        return any(keyword in line_lower for keyword in job_keywords)
+        """Check if line looks like a job title, avoid picking project headers."""
+        line_lower = line.lower().strip()
+        # Avoid lines that are clearly section headers for projects or education
+        if re.match(r'^\s*(projects?|education)\b', line_lower):
+            return False
+        job_keywords = ['engineer', 'developer', 'analyst', 'manager', 'director', 'specialist', 'consultant', 'intern']
+        # Titles should be reasonably short and not end with 'link' or 'repo'
+        if 'repo' in line_lower or 'link' in line_lower:
+            return False
+        return any(keyword in line_lower for keyword in job_keywords) and len(line) < 120
     
     def _parse_experience_without_dates(self, lines: List[str], start_idx: int) -> Optional[ExperienceEntry]:
         """Parse experience entry without explicit dates"""
@@ -1363,16 +1407,23 @@ class EnhancedFraudDetector:
         """Infer if position was full-time"""
         text_lower = text.lower()
         
-        part_time_indicators = ['intern', 'internship', 'part-time', 'contract', 'freelance', 'temporary']
+        part_time_indicators = ['intern', 'internship', 'part-time', 'contract', 'freelance', 'temporary', 'project-based', 'consultant']
         full_time_indicators = ['full-time', 'permanent', 'staff']
         
         if any(indicator in text_lower for indicator in part_time_indicators):
             return False
-        elif any(indicator in text_lower for indicator in full_time_indicators):
+        if any(indicator in text_lower for indicator in full_time_indicators):
             return True
         
-        # Default to full-time if unclear
-        return True
+        # Default: treat as full-time only if role/company present and duration >= 6 months; else lean non-full-time
+        approx_months = 0
+        date_match = re.search(r'(\w+\s+\d{4}|\d{1,2}[/-]\d{4}|\d{4})\s*[-–—]\s*(present|current|\w+\s+\d{4}|\d{1,2}[/-]\d{4}|\d{4})', text_lower, re.I)
+        if date_match:
+            start = self._parse_date(date_match.group(1))
+            end = self._parse_date(date_match.group(2)) or datetime.now()
+            if start and end:
+                approx_months = self._calculate_months_between(start, end)
+        return approx_months >= 6
     
     def _extract_skills_from_text(self, text: str) -> List[str]:
         """Extract skills mentioned in text"""
