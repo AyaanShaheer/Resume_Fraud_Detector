@@ -2,6 +2,14 @@
 
 This project provides an end-to-end system to detect fraudulent patterns in resumes, optionally compare with job descriptions and LinkedIn profiles, compute a fit score, and produce JSON/HTML reports. A Streamlit UI is provided for interactive use, and a CLI is available for batch runs.
 
+<img width="1917" height="945" alt="Screenshot 2025-08-21 093157" src="https://github.com/user-attachments/assets/f53d710f-2459-4b93-a386-8adc9d5de17b" />
+<img width="1532" height="718" alt="Screenshot 2025-08-21 093205" src="https://github.com/user-attachments/assets/6e779ad0-53f4-414f-883d-33c7b9094ef8" />
+
+
+<img width="1917" height="945" alt="Screenshot 2025-08-21 093157" src="https://github.com/user-attachments/assets/2fcbc0c5-d253-460e-b764-aaac83388801" />
+<img width="1532" height="718" alt="Screenshot 2025-08-21 093205" src="https://github.com/user-attachments/assets/a5320ae6-963a-4ee1-95ef-13ba4270dd79" />
+
+
 ## Features
 - AI/NLP-driven analysis of resumes
 - Fraud flags: timeline overlaps, skill inflation, education mismatches, plagiarism indicators, verification discrepancies
