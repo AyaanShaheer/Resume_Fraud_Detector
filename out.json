@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-08-21T02:41:29.362262",
+  "timestamp": "2025-08-21T03:05:20.200229",
   "candidate_profile": {
     "name": "John Doe",
     "email": "john.doe@example.com",
@@ -26,7 +26,7 @@
         "company": "Acme Inc.",
         "role": "Software Engineer",
         "start_date": "2021-01-01T00:00:00",
-        "end_date": "2025-08-21T02:41:29.357732",
+        "end_date": "2025-08-21T03:05:20.196250",
         "duration_months": 55,
         "is_full_time": true,
         "is_current": true,
@@ -64,14 +64,14 @@
       }
     ],
     "skills": [
-      "aws",
-      "scikit-learn",
-      "pandas",
-      "python",
+      "docker",
       "numpy",
-      "tensorflow",
+      "python",
       "kubernetes",
-      "docker"
+      "pandas",
+      "tensorflow",
+      "scikit-learn",
+      "aws"
     ],
     "certifications": [],
     "languages": [],

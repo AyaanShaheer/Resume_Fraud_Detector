@@ -395,9 +395,10 @@ class EnhancedFraudDetector:
         while i < len(lines):
             raw_line = lines[i]
             line = raw_line.strip()
-            # Track section
+            # Track section (strip non-letter prefixes like bullets or symbols)
+            header_line = re.sub(r'^[^A-Za-z]+', '', line)
             for name, rx in section_markers.items():
-                if rx.search(line):
+                if rx.search(header_line):
                     section = name
                     break
             
@@ -1346,10 +1347,16 @@ class EnhancedFraudDetector:
         return {"degree_level": highest_level if highest_level else None, "fields": fields}
     
     def _looks_like_job_title(self, line: str) -> bool:
-        """Check if line looks like a job title"""
-        line_lower = line.lower()
-        job_keywords = ['engineer', 'developer', 'analyst', 'manager', 'director', 'specialist', 'consultant']
-        return any(keyword in line_lower for keyword in job_keywords)
+        """Check if line looks like a job title, avoid picking project headers."""
+        line_lower = line.lower().strip()
+        # Avoid lines that are clearly section headers for projects or education
+        if re.match(r'^\s*(projects?|education)\b', line_lower):
+            return False
+        job_keywords = ['engineer', 'developer', 'analyst', 'manager', 'director', 'specialist', 'consultant', 'intern']
+        # Titles should be reasonably short and not end with 'link' or 'repo'
+        if 'repo' in line_lower or 'link' in line_lower:
+            return False
+        return any(keyword in line_lower for keyword in job_keywords) and len(line) < 120
     
     def _parse_experience_without_dates(self, lines: List[str], start_idx: int) -> Optional[ExperienceEntry]:
         """Parse experience entry without explicit dates"""
@@ -1400,16 +1407,23 @@ class EnhancedFraudDetector:
         """Infer if position was full-time"""
         text_lower = text.lower()
         
-        part_time_indicators = ['intern', 'internship', 'part-time', 'contract', 'freelance', 'temporary']
+        part_time_indicators = ['intern', 'internship', 'part-time', 'contract', 'freelance', 'temporary', 'project-based', 'consultant']
         full_time_indicators = ['full-time', 'permanent', 'staff']
         
         if any(indicator in text_lower for indicator in part_time_indicators):
             return False
-        elif any(indicator in text_lower for indicator in full_time_indicators):
+        if any(indicator in text_lower for indicator in full_time_indicators):
             return True
         
-        # Default to full-time if unclear
-        return True
+        # Default: treat as full-time only if role/company present and duration >= 6 months; else lean non-full-time
+        approx_months = 0
+        date_match = re.search(r'(\w+\s+\d{4}|\d{1,2}[/-]\d{4}|\d{4})\s*[-–—]\s*(present|current|\w+\s+\d{4}|\d{1,2}[/-]\d{4}|\d{4})', text_lower, re.I)
+        if date_match:
+            start = self._parse_date(date_match.group(1))
+            end = self._parse_date(date_match.group(2)) or datetime.now()
+            if start and end:
+                approx_months = self._calculate_months_between(start, end)
+        return approx_months >= 6
     
     def _extract_skills_from_text(self, text: str) -> List[str]:
         """Extract skills mentioned in text"""
