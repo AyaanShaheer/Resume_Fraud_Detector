@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-08-21T02:29:49.590836",
+  "timestamp": "2025-08-21T02:41:29.362262",
   "candidate_profile": {
     "name": "John Doe",
     "email": "john.doe@example.com",
@@ -26,7 +26,7 @@
         "company": "Acme Inc.",
         "role": "Software Engineer",
         "start_date": "2021-01-01T00:00:00",
-        "end_date": "2025-08-21T02:29:49.586321",
+        "end_date": "2025-08-21T02:41:29.357732",
         "duration_months": 55,
         "is_full_time": true,
         "is_current": true,
@@ -39,7 +39,9 @@
         ],
         "achievements": [
           "improved model accuracy by 12% - Deployed services on AWS with Docker and Kubernetes"
-        ]
+        ],
+        "section": "experience",
+        "entry_type": "experience"
       },
       {
         "text": "Data Analyst at Beta Corp \u2014 2019 - 2020 - Analyzed sales data with Python and Pandas; reduced reporting time by 30%",
@@ -56,22 +58,24 @@
         ],
         "achievements": [
           "reduced reporting time by 30%"
-        ]
+        ],
+        "section": "experience",
+        "entry_type": "experience"
       }
     ],
     "skills": [
-      "tensorflow",
-      "kubernetes",
-      "numpy",
+      "aws",
       "scikit-learn",
       "pandas",
-      "docker",
       "python",
-      "aws"
+      "numpy",
+      "tensorflow",
+      "kubernetes",
+      "docker"
     ],
     "certifications": [],
     "languages": [],
-    "total_experience_years": 5.6,
+    "total_experience_years": 5.8,
     "career_level": "Mid"
   },
   "fraud_flags": [],
