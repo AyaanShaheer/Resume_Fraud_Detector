@@ -6,8 +6,6 @@ This project provides an end-to-end system to detect fraudulent patterns in resu
 <img width="1532" height="718" alt="Screenshot 2025-08-21 093205" src="https://github.com/user-attachments/assets/6e779ad0-53f4-414f-883d-33c7b9094ef8" />
 
 
-<img width="1917" height="945" alt="Screenshot 2025-08-21 093157" src="https://github.com/user-attachments/assets/2fcbc0c5-d253-460e-b764-aaac83388801" />
-<img width="1532" height="718" alt="Screenshot 2025-08-21 093205" src="https://github.com/user-attachments/assets/a5320ae6-963a-4ee1-95ef-13ba4270dd79" />
 
 
 ## Features
